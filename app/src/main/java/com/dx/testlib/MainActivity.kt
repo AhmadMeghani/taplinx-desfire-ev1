@@ -13,14 +13,41 @@ import com.nxp.nfclib.CardType
 import com.nxp.nfclib.KeyType
 import com.nxp.nfclib.NxpNfcLib
 import com.nxp.nfclib.defaultimpl.KeyData
-import com.nxp.nfclib.desfire.DESFireFactory
+import com.nxp.nfclib.desfire.*
 import com.nxp.nfclib.desfire.DESFireFile.StdDataFileSettings
-import com.nxp.nfclib.desfire.EV2ApplicationKeySettings
-import com.nxp.nfclib.desfire.IDESFireEV1
-import com.nxp.nfclib.desfire.IDESFireEV2
 import com.nxp.nfclib.exceptions.NxpNfcLibException
 import com.nxp.nfclib.interfaces.IKeyData
 import com.nxp.nfclib.utils.Utilities
+import java.nio.ByteBuffer
+import java.util.*
+
+data class MyFileSettings(val settings : DESFireFile.FileSettings, val len:Int) {}
+
+fun IDESFireEV2.getFileSettings(fileNo: Byte) : MyFileSettings {
+    val response = this.reader.transceive(
+            byteArrayOf(0x90.toByte(),0xF5.toByte(), 0x00, 0x00, 0x01, fileNo.toByte(), 0x00))
+
+    val sw = response.takeLast(2).toByteArray()
+    if (!Arrays.equals(sw, byteArrayOf(0x91.toByte(), 0x00))) {
+        throw SecurityException("Failed to get file size for file ${fileNo}")
+    }
+
+    val buf3 = response.slice(4..6).toByteArray()
+    buf3.reverse()
+    val buf4 = ByteArray(4)
+    buf3.copyInto(buf4,1, 0, buf3.size)
+    val fileSize = ByteBuffer.wrap(buf4).int
+    val fs = this.getFileSettings(fileNo.toInt())
+    val settings = StdDataFileSettings(
+            fs.comSettings,
+            fs.readAccess,
+            fs.writeAccess,
+            fs.readWriteAccess,
+            fs.changeAccess,
+            fileSize)
+
+    return MyFileSettings(settings, fileSize)
+}
 
 class MainActivity : AppCompatActivity() {
 
