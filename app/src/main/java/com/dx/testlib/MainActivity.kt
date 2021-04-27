@@ -18,6 +18,10 @@ import com.nxp.nfclib.desfire.DESFireFile.StdDataFileSettings
 import com.nxp.nfclib.exceptions.NxpNfcLibException
 import com.nxp.nfclib.interfaces.IKeyData
 import com.nxp.nfclib.utils.Utilities
+import dx.android.common.logger.Log
+import dx.android.common.logger.LogFragment
+import dx.android.common.logger.LogWrapper
+import dx.android.common.logger.MessageOnlyLogFilter
 import java.nio.ByteBuffer
 import java.util.*
 
@@ -58,15 +62,14 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val licenseKey = "f00ce3219672be96dc487e971d62ff2f"
-        var objKEY_2KTDES: IKeyData? = null
-        val KEY_2KTDES = byteArrayOf(
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
+        var objKEY_2TDEA: IKeyData? = null
+        val KEY_2TDEA = byteArrayOf(
                 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
                 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
                 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
                 0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte())
-        val timeOut = 2000
+        const val timeOut = 2000L
+        const val TAG = "MainActivity"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -78,12 +81,9 @@ class MainActivity : AppCompatActivity() {
         intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
         nfcPendingIntent = PendingIntent.getActivity(this, 0, intent, 0)
 
+        initializeLogging()
         initializeLibrary()
-
-        val keyDataObj = KeyData()
-        var k: Key = SecretKeySpec(KEY_2KTDES, "DESede")
-        keyDataObj.key = k
-        objKEY_2KTDES = keyDataObj
+        initializeKeys()
     }
 
     override fun onResume() {
@@ -108,17 +108,36 @@ class MainActivity : AppCompatActivity() {
         try {
             libInstance.registerActivity(this, licenseKey)
         } catch (ex: NxpNfcLibException) {
-            print(ex.message)
+            Log.i(TAG, ex.message)
         } catch (e: Exception) {
-            print(e.message)
+            Log.i(TAG, e.message)
         }
+    }
+
+    private fun initializeLogging() {
+        val msgFilter = MessageOnlyLogFilter()
+        val logFragment = supportFragmentManager.findFragmentById(R.id.mylogfragment) as LogFragment
+        msgFilter.next = logFragment.logView
+
+        val logWrapper = LogWrapper()
+        logWrapper.next = msgFilter
+
+        Log.logNode = logWrapper
+    }
+
+    private fun initializeKeys() {
+        val keyDataObj = KeyData()
+        var k: Key = SecretKeySpec(KEY_2TDEA, "DESede")
+        keyDataObj.key = k
+        objKEY_2TDEA = keyDataObj
     }
 
     private fun checkCard(intent: Intent) {
         val type = libInstance.getCardType(intent) //Get the type of the card
 
         if (type == CardType.UnknownCard) {
-            print("Unknown card type")
+            Log.i(TAG, "Unknown card type")
+            return
         }
 
         when (type) {
@@ -127,19 +146,19 @@ class MainActivity : AppCompatActivity() {
                 if (desFireEV2.subType == IDESFireEV2.SubType.MIFAREIdentity) {
                     val mfID = DESFireFactory.getInstance().getMIFAREIdentity(libInstance.customModules)
                     val fciData = mfID.selectMIFAREIdentityAppAndReturnFCI()
+                    Log.i(TAG, "IDESFireEV2.SubType.MIFAREIdentity")
                 } else {
                     try {
                         desFireEV2.reader.connect()
+                        desFireEV2.reader.timeout = timeOut
                         writeToCard(desFireEV2)
-                        print("DESFire card detected")
                     } catch (t: Throwable) {
-                        t.printStackTrace()
-                        print("Unknown Error Tap Again")
+                        Log.e(TAG, t.message)
                     }
                 }
             }
             else -> {
-                print("Not a DESFire card")
+                Log.i(TAG, "${type.tagName} not implemented")
             }
         }
     }
@@ -152,50 +171,63 @@ class MainActivity : AppCompatActivity() {
         val freeMem = desFireEV2.freeMemory
 
         try {
-            desFireEV2.reader.timeout = timeOut.toLong()
             val getVersion = desFireEV2.version
 
-            if (getVersion[0] == 0x04.toByte()) {
-                println("NXP")
-            } else {
-                println("not NXP")
+            if (getVersion[0] != 0x04.toByte()) {
+                Log.i(TAG, "not NXP")
             }
 
             if (getVersion[6] == 0x05.toByte()) {
-                println("ISO/IEC 14443–4")
+                Log.i(TAG, "ISO/IEC 14443–4")
             } else {
-                println("unknown")
+                Log.i(TAG, "unknown protocol")
             }
 
+            var keyNo = 0
             desFireEV2.selectApplication(0)
-            desFireEV2.authenticate(0, IDESFireEV1.AuthType.Native, KeyType.THREEDES, objKEY_2KTDES)
+            desFireEV2.authenticate(keyNo, IDESFireEV1.AuthType.Native, KeyType.THREEDES, objKEY_2TDEA)
 
             val app_Ids = desFireEV2.applicationIDs
             for (app_id in app_Ids) {
                 val ids: ByteArray = Utilities.intToBytes(app_id, 3)
                 val str: String = Utilities.byteToHexString(ids)
-                println("AID: " + str)
+                Log.i(TAG,"AID: " + str)
             }
 
             // create new application
             val appAID = byteArrayOf(0x05, 0x05, 0x05)
-            val ks = byteArrayOf(0x0F, 0x0E)
-            val appKs = EV2ApplicationKeySettings(ks)
-            desFireEV2.createApplication(appAID, appKs)
 
-            // select an application and authenticate to it
+            val appSetting = EV2ApplicationKeySettings.Builder()
+                    .setMaxNumberOfApplicationKeys(10)
+                    .setAppKeySettingsChangeable(true)
+                    .setAuthenticationRequiredForDirectoryConfigurationData(false)
+                    .setAuthenticationRequiredForFileManagement(false)
+                    .setAppMasterKeyChangeable(true)
+                    .build()
+
+            desFireEV2.createApplication(appAID, appSetting)
+
+            // select the application and authenticate to it
             desFireEV2.selectApplication(appAID)
-            desFireEV2.authenticate(0, IDESFireEV1.AuthType.Native, KeyType.THREEDES, objKEY_2KTDES)
+            desFireEV2.authenticate(keyNo, IDESFireEV1.AuthType.Native, KeyType.THREEDES, objKEY_2TDEA)
 
             // create a standard file of 64 bytes size under the application
             val fileSize = 64
             val fileNo = 0
+            val fileOffset = 0
             desFireEV2.createFile(fileNo, StdDataFileSettings(
                     IDESFireEV1.CommunicationType.Enciphered,
-                    0x2.toByte(), 0x1.toByte(), 0.toByte(), 0.toByte(), fileSize))
+                    0x01, 0x02, 0x03, 0x04, fileSize))
 
+            // authenticate again to acquire write access permission
+            keyNo = 0x02
+            desFireEV2.authenticate(keyNo, IDESFireEV1.AuthType.Native, KeyType.THREEDES, objKEY_2TDEA)
+
+            val content = byteArrayOf(0xFA.toByte(), 0xCE.toByte(), 0xBA.toByte(), 0xBE.toByte())
+            desFireEV2.writeData(fileNo, fileOffset, content)
+            Log.i(TAG,"Success write to ${Utilities.byteToHexString(appAID)}/${fileNo}: " + Utilities.byteToHexString(content))
         } catch (e: java.lang.Exception) {
-            println("Unable to read")
+            Log.e(TAG, e.message)
         }
     }
 
