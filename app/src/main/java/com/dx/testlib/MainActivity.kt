@@ -205,6 +205,7 @@ class MainActivity : AppCompatActivity() {
                     .setAppMasterKeyChangeable(true)
                     .build()
 
+            Log.i(TAG,"app setting: " + Utilities.byteToHexString(appSetting.toByteArray()))
             desFireEV2.createApplication(appAID, appSetting)
 
             // select the application and authenticate to it
