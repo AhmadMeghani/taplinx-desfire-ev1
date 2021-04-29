@@ -63,11 +63,7 @@ class MainActivity : AppCompatActivity() {
     companion object {
         const val licenseKey = "f00ce3219672be96dc487e971d62ff2f"
         var objKEY_2TDEA: IKeyData? = null
-        val KEY_2TDEA = byteArrayOf(
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte(),
-                0x00.toByte(), 0x00.toByte(), 0x00.toByte(), 0x00.toByte())
+        val KEY_2TDEA = Utilities.stringToBytes("00000000000000000000000000000000")
         const val timeOut = 2000L
         const val TAG = "MainActivity"
     }
