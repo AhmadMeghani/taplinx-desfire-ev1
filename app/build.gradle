@@ -45,6 +45,7 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
 
     implementation files('libs/nxpnfcandroidlib-release-protected.aar')
+    implementation files('libs/transitsdk.aar')
 //    implementation files('libs/nxpnfcandroidlib-release.aar')
     implementation 'com.google.firebase:firebase-core:16.0.7'
 }

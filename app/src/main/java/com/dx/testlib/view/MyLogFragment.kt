@@ -1,4 +1,4 @@
-package com.dx.testlib
+package com.dx.testlib.view
 
 import dx.android.common.logger.LogFragment
 

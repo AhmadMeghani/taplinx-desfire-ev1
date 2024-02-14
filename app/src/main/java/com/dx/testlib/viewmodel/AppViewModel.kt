@@ -1,11 +1,15 @@
-package com.dx.testlib
+package com.dx.testlib.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.dx.testlib.MainActivity.Companion.TAG
-import com.nxp.nfclib.desfire.IDESFireEV1
+import com.dx.testlib.manager.CardManager
+import com.dx.testlib.manager.DataFileManager
+import com.dx.testlib.view.MainActivity.Companion.TAG
 import dx.android.common.logger.Log
 
-class AppViewModel(private val cardManager: CardManager, private val dataFileManager: DataFileManager) : ViewModel() {
+class AppViewModel(
+    private val cardManager: CardManager,
+    private val dataFileManager: DataFileManager
+) : ViewModel() {
 
     private val appAID = byteArrayOf(0x06, 0x06, 0x06)
 
@@ -14,11 +18,11 @@ class AppViewModel(private val cardManager: CardManager, private val dataFileMan
             performInitialOperations()
 
             dataFileManager.createStandardDataFile()
-            dataFileManager.writeDataToStandardFile()
+//            dataFileManager.writeDataToStandardFile()
 
             Log.i(TAG, "Success creating and writing to Standard Data File")
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
@@ -32,7 +36,7 @@ class AppViewModel(private val cardManager: CardManager, private val dataFileMan
 
             Log.i(TAG, "Success creating Value File and crediting value")
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
@@ -46,7 +50,7 @@ class AppViewModel(private val cardManager: CardManager, private val dataFileMan
 
             Log.i(TAG, "Success creating Linear Record File and writing record")
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
@@ -60,43 +64,51 @@ class AppViewModel(private val cardManager: CardManager, private val dataFileMan
 
             Log.i(TAG, "Success creating Cyclic Record File and writing record")
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
 
 
-    fun readCyclicFileRecords() {
+    fun readCyclicFileRecords(fileNo: Int, recordSize: Int) {
         try {
             performInitialOperations()
 
-            dataFileManager.readCyclicRecordFile(16)
+            dataFileManager.readCyclicRecordFile(fileNo, recordSize)
 
-            Log.i(TAG, "Success cyclic Linear Record File record")
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
 
-    fun readLinearFileRecords() {
+    fun readLinearFileRecords(fileNo: Int, recordSize: Int) {
         try {
             performInitialOperations()
 
-            dataFileManager.readLinearRecordFile(16)
-
-            Log.i(TAG, "Success reading Linear Record File record")
+            dataFileManager.readLinearRecordFile(fileNo, recordSize)
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
             // Handle error
         }
     }
 
-    fun readValueFile() {
+    fun readStandardFile(fileNo: Int) {
         try {
-            dataFileManager.readValueFile()
+            performInitialOperations()
+
+            dataFileManager.readStandardFile(fileNo)
         } catch (e: Exception) {
-            Log.e(TAG, e.message)
+            Log.i(TAG, e.message)
+            // Handle error
+        }
+    }
+
+    fun readValueFile(fileNo: Int) {
+        try {
+            dataFileManager.readValueFile(fileNo)
+        } catch (e: Exception) {
+            Log.i(TAG, e.message)
         }
     }
 
@@ -108,5 +120,19 @@ class AppViewModel(private val cardManager: CardManager, private val dataFileMan
 
         cardManager.selectApplicationByAID(appAID)
         cardManager.authenticateToApplication()
+    }
+
+    fun readAllFiles() {
+        performInitialOperations()
+        val allFiles = dataFileManager.getAllFiles()
+        for(file in allFiles) {
+            when(file) {
+                1,2,4,5 -> readStandardFile(file)
+                3 -> readValueFile(file)
+                6,7,9 -> readLinearFileRecords(file, 256)
+                8 -> readCyclicFileRecords(file, 280)
+            }
+        }
+
     }
 }
